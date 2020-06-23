@@ -13,7 +13,6 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -713,14 +712,10 @@ func (ge *goEncoder) writeSOAPFunc(w io.Writer, d *wsdl.Definitions, op *wsdl.Op
 	retDefaults[len(retDefaults)-1] = "err"
 
 	// Check if we need to prefix the op with a namespace
-	mInput := ge.funcs[op.Name].Input
 	namespacedOpName := op.Name
-
-	if mInput != nil {
-		nsSplit := strings.Split(mInput.Message, ":")
-		if len(nsSplit) > 1 {
-			namespacedOpName = nsSplit[0] + ":" + namespacedOpName
-		}
+	nsSplit := strings.Split(ge.funcs[op.Name].Input.Message, ":")
+	if len(nsSplit) > 1 {
+		namespacedOpName = nsSplit[0] + ":" + namespacedOpName
 	}
 
 	// The response name is always the operation name + "Response" according to specification.
@@ -1367,27 +1362,17 @@ func (ge *goEncoder) genGoStruct(w io.Writer, d *wsdl.Definitions, ct *wsdl.Comp
 
 func (ge *goEncoder) genGoOpStruct(w io.Writer, d *wsdl.Definitions, bo *wsdl.BindingOperation) error {
 	name := goSymbol(bo.Name)
-	function := ge.funcs[name]
 
-	if function.Input == nil {
-		log.Printf("function input is nil! %v is %v", name, function)
-	} else {
-		message := trimns(function.Input.Message)
-		inputMessage := ge.messages[message]
+	inputMessage := ge.messages[trimns(ge.funcs[bo.Name].Input.Message)]
 
-		// No-Op on operations which don't take arguments
-		// (These can be inlined, and don't need to pollute the file)
-		if len(inputMessage.Parts) > 0 {
-			ge.genOpStructMessage(w, d, name, inputMessage)
-		}
+	// No-Op on operations which don't take arguments
+	// (These can be inlined, and don't need to pollute the file)
+	if len(inputMessage.Parts) > 0 {
+		ge.genOpStructMessage(w, d, name, inputMessage)
 	}
 
-	if function.Output == nil {
-		log.Printf("function output is nil! %v is %v", name, function)
-	} else {
-		// Output messages are always required
-		ge.genOpStructMessage(w, d, name, ge.messages[trimns(ge.funcs[bo.Name].Output.Message)])
-	}
+	// Output messages are always required
+	ge.genOpStructMessage(w, d, name, ge.messages[trimns(ge.funcs[bo.Name].Output.Message)])
 
 	return nil
 }
